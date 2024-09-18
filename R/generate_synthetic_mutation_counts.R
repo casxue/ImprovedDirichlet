@@ -3,7 +3,6 @@ require(dplyr)
 require(LaplacesDemon)
 
 ##### Functions #####
-
 reorder.cosmic <- function ()  {
     pyrs <- c("C", "T")
     nucs <- c("A", "C", "G", "T")
@@ -34,13 +33,15 @@ reorder.cosmic <- function ()  {
 }
 
 read.COSMIC.sigs <- function (version = "v2", build = "GRCh37")  {
-    sigs.file <- file.path("../data/", paste0("COSMIC_", version, "_SBS_", build, ".txt"))
+    sigs.file <- file.path("data/", paste0("COSMIC_", version, "_SBS_", build, ".txt"))
     cosmic <- read.csv(sigs.file, sep = "\t", header = T, row.names = 1)[reorder.cosmic(),]
     return(as.matrix(cosmic))
 }
 
 loadings.nnls <- function (counts, sigs = read.COSMIC.sigs())  {
-    return(apply(counts, 2, function (y) {nnls(sigs, y)$x})) ## K x J
+  theta <- apply(counts, 2, function (y) {nnls(sigs, y)$x})
+  rownames(theta) <- colnames(sigs)
+  return(theta) ## K x J
 }
 
 ## prune loadings before generating synthetic data
@@ -121,14 +122,10 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
 }
 
 
-##### Code #####
-## I = # of channels in each signature
-## J = # of patients
-## K = # of COSMIC signatures
-sigs <- read.COSMIC.sigs()  ## I x K
-counts <- read.csv("../../../BayesPowerSig/BPS-PCAWG-sigs/21_breast_cancers.mutations.txt", sep = "\t", row.names = 1)  ## I x J
-prelim.loadings <- loadings.nnls(counts, sigs)
-trimmed.loadings <- trim.loadings(prelim.loadings)
-simulate.counts(trimmed.loadings, sigs, "poisson")
+# sigs <- read.COSMIC.sigs()  ## I x K
+# counts <- read.csv("../../../BayesPowerSig/BPS-PCAWG-sigs/21_breast_cancers.mutations.txt", sep = "\t", row.names = 1)  ## I x J
+# prelim.loadings <- loadings.nnls(counts, sigs)
+# trimmed.loadings <- trim.loadings(prelim.loadings)
+# simulate.counts(trimmed.loadings, sigs, "poisson")
 
 

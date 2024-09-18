@@ -155,20 +155,20 @@ dens.max.dir <- function (center, V = 0.01) {
 } 
 
 
-
-## Load COSMIC v2 signatures
-channel.order <- c()
-pyrs <- c("C", "T")
-nucs <- c("A", "C", "G", "T")
-for (i in pyrs)  {
-    for (j in setdiff(nucs, i))  {
-        for (k in nucs)  {
-            for (l in nucs)  {
-                channel.order <- c(channel.order, sprintf("%s[%s>%s]%s", k, i, j, l))
-            }
-        }
-    }
-}
-cosmic <- read.csv("COSMIC_v2_SBS_GRCh37.txt", sep = "\t", header = T, row.names = 1)[channel.order,]
-
-
+# 
+# ## Load COSMIC v2 signatures
+# channel.order <- c()
+# pyrs <- c("C", "T")
+# nucs <- c("A", "C", "G", "T")
+# for (i in pyrs)  {
+#     for (j in setdiff(nucs, i))  {
+#         for (k in nucs)  {
+#             for (l in nucs)  {
+#                 channel.order <- c(channel.order, sprintf("%s[%s>%s]%s", k, i, j, l))
+#             }
+#         }
+#     }
+# }
+# cosmic <- read.csv("COSMIC_v2_SBS_GRCh37.txt", sep = "\t", header = T, row.names = 1)[channel.order,]
+# 
+# 
