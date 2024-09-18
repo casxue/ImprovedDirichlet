@@ -138,7 +138,12 @@ dens.max.conc <- function (center, conc = 1000, eps = 1e-8) {
 
 
 ## density maximization parameters for Dirichlet
-dens.max.dir <- function (center, V = 0.01) {
+dens.max.dir <- function (center, V = 0.01, renormalize = TRUE) {
+    if (renormalize && sum(center == 0) > 0)  {
+        center[center == 0] <- 1e-16
+        center <- center / sum(center)
+    }
+    
     i.star <- which.min(sapply(center, function (c) {min(c, 1 - c)}))[1]
     lst <- dens.max.var(center[i.star], V)
     conc <- lst$a + lst$b

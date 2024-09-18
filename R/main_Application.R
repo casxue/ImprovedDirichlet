@@ -1,4 +1,4 @@
-# This file runs a mutational signature analysis on syntetic data to test the 
+# This file runs a mutational signature analysis on synthetic data to test the 
 # effectiveness of the optimally-tuned Dirichlet prior
 
 library(CompressiveNMF)
@@ -41,6 +41,7 @@ X <- simulate.counts(loadings, sigs[, sig_to_include], "poisson")
 # low variance
 samples <- 100
 burnin <- 500
+
 
 S1 <- do.call("cbind", apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.01))))
 
