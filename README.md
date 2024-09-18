@@ -1,1 +1,3 @@
 # ImprovedDirichlet
+
+This repository reproduces the analysis of... 
