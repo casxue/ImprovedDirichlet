@@ -51,7 +51,8 @@ trim.loadings <- function (loadings, overall.threshold = 2, individual.threshold
     K <- nrow(loadings)
     full.normalized.loadings <- loadings / sum(loadings)
     individual.normalized.loadings <- loadings / colSums(loadings)[col(loadings)]
-    keep <- (rowSums(full.normalized.loadings) > overall.threshold) | (apply(individual.normalized.loadings, 1, max) > individual.threshold)
+    keep <- (rowSums(full.normalized.loadings) * 100 > overall.threshold) | 
+            (apply(individual.normalized.loadings, 1, max) * 100 > individual.threshold)
     loadings[!keep,] <- 0
     return(loadings)
 }
