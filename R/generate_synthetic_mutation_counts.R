@@ -75,8 +75,7 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
             matrix(nrow = I, ncol = J)
     } else if (mode == "overdispersed")  {
         if (param <= 1)  {
-            print("Parameter must be >1 for overdispersed DGP")
-            return()
+            stop("Parameter must be >1 for overdispersed DGP")
         }
         means <- sigs %*% loadings
         new.counts <- means %>%
@@ -84,8 +83,7 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
             matrix(nrow = I, ncol = J)
     } else if (mode == "perturbed")  {
         if (param >= 1 || param <= 0)  {
-            print("Parameter must be between 0 and 1 for perturbed DGP")
-            return()
+            stop("Parameter must be between 0 and 1 for perturbed DGP")
         }
         ## log (mean error / sparsity) = 3.6641 - 0.9820 log (concentration)
         ## sparsity = 1 / (I * ||sig||^2)
@@ -104,8 +102,7 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
         }
     } else if (mode == "contamination")  {
         if (param <= 0)  {
-            print("Parameter must be >0 for contamination DGP")
-            return()
+            stop("Parameter must be >0 for contamination DGP")
         }
         error.sigs <- t(rdirichlet(J, rep(0.5, I)))
         error.loadings <- param * 0.01 * colSums(loadings)
@@ -115,9 +112,10 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
             new.counts[,j] <- sapply(means, function (y) {rpois(1, lambda = y)})
         }
     } else  {
-        print("invalid mode")
-        return()
+        stop("invalid mode")
     }
+    colnames(new.counts) <- colnames(loadings)
+    rownames(new.counts) <- rownames(sigs)
     return(new.counts)
 }
 

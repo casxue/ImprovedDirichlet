@@ -12,6 +12,7 @@ library(doParallel)
 source("R/generate_synthetic_mutation_counts.R")
 source("R/plot_signature.R")
 source("R/initialize_prior.R")
+source("R/application_functions.R")
 
 # Simulate the data
 ## I = n. of channels in each signature
@@ -19,6 +20,7 @@ source("R/initialize_prior.R")
 ## K = n. of COSMIC signatures
 # Load signatures
 sigs <- read.COSMIC.sigs(version = "v3")  ## I x K
+plot.SBS.signature(sigs[, 1])
 # Load pcawg data
 counts_pcawg <- read.csv("data/WGS_PCAWG.96.ready.tsv", sep = "\t", row.names = 1)  ## I x J
 names_pcawg <- str_split(colnames(counts_pcawg), pattern = "\\.\\.", simplify = TRUE)
@@ -39,14 +41,72 @@ X <- simulate.counts(loadings, sigs[, sig_to_include], "poisson")
 # Run 4 models
 
 # low variance
-samples <- 100
-burnin <- 500
+nsamples <- 500
+burnin <- 2500
 
 
-S1 <- do.call("cbind", apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.01))))
+PriorMax1 <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.1/96)))
+PriorMax2 <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 6e-7)))
 
-S2<- do.call("cbind", apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.0001))))
+PriorFixed1 <- apply(sigs, 2, function(x) x * 100)
+PriorFixed2 <- apply(sigs, 2, function(x) x * 1000)
 
+
+out1 <- CompressiveNMF::CompressiveNMF(X, K = 0, S = PriorMax2, 
+                      betah = rep(1, ncol(PriorMax1)), 
+                      nsamples = nsamples, 
+                      burnin = burnin, 
+                      swap_prior = TRUE)
+
+CompressiveNMF:::print.CompressiveNMF(out1)
+plot(out1$Signatures[, 1], sigs[, 1])
+
+sum(abs(log(sigs[, 1]/out1$Signatures[, 1])))
+
+sigs[8, 1]/out1$Signatures[, 1]
+
+out2 <- CompressiveNMF::CompressiveNMF(X, K = 0, S = PriorFixed2, 
+                       betah = rep(1, ncol(PriorFixed1)), 
+                       nsamples = nsamples, 
+                       burnin = burnin, 
+                       swap_prior = TRUE)
+
+CompressiveNMF:::print.CompressiveNMF(out2)
+
+plot(out2$Signatures[, 1], sigs[, 1])
+sum(abs(log(sigs[, 1]/out2$Signatures[, 1])))
+
+CompressiveNMF:::plot_matrix_signature_v2(out1$Signatures)
+
+rownames(out1$Signatures) <- rownames(PriorFixed2)
+plot.SBS.signature(out1$Signatures[, 12])
+plot.SBS.signature(sigs[,"SBS44"])
+
+matched <- match_MutSign(sigs[, sig_to_include], R_hat = out1$Signatures)
+
+i <- 2
+plot.SBS.signature(matched$R_hat[, i])
+plot.SBS.signature(matched$R_true[, i])
+
+matched$R_hat
+
+out1
+
+
+
+colSums(S2)
+
+S1 <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.1/96)))
+S2 <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 6e-7)))
+
+plot(S1[, 1], sigs[, 1])
+
+i <- 2
+samples <- rdirichlet(2000, S2[, "SBS40"])
+CI <- t(apply(samples, 2, function(x) quantile(x, c(0.05, 0.95))))
+plot.SBS.signature(sigs[, "SBS40"], CI = CI)
+
+hist(CI[, 2] - CI[,1])
 
 list <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = 0.0001)))
 
