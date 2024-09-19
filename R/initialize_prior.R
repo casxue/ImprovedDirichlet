@@ -77,11 +77,11 @@ proposal.med.var <- function (c, V, precision = 3) {
 
 
 ## Minimum and maximum valid mean for a given variance, with small buffer
-u.min <- function (V, eps = 1e-8)  {
+u.min <- function (V, eps = 1e-18)  {
     return((1 - sqrt(1 - 4 * V)) / 2 + eps)
 }
 
-u.max <- function (V, eps = 1e-8)  {
+u.max <- function (V, eps = 1e-18)  {
     return((1 + sqrt(1 - 4 * V)) / 2 - eps)
 }
 
@@ -127,7 +127,7 @@ dens.max.var <- function (center, V = 0.01) {
 
 
 ## density maximization parameters, fixed concentration
-dens.max.conc <- function (center, conc = 1000, eps = 1e-8) {
+dens.max.conc <- function (center, conc = 1000, eps = 1e-18) {
     roots <- uniroot.all(g.prime, lower = eps, upper = 1 - eps, center = center, conc = conc)
     ind <- sapply(roots, prop.dens, loc = center, conc = conc) %>% which.max()
     if (length(ind) > 1)  ind <- ind[1]
@@ -139,8 +139,8 @@ dens.max.conc <- function (center, conc = 1000, eps = 1e-8) {
 
 ## density maximization parameters for Dirichlet
 dens.max.dir <- function (center, V = 0.01, renormalize = TRUE) {
-    if (renormalize && sum(center == 0) > 0)  {
-        center[center == 0] <- 1e-16
+    if (renormalize && sum(center == 1e-16) > 0)  {
+        center[center == 1e-16] <- 1e-16
         center <- center / sum(center)
     }
     
