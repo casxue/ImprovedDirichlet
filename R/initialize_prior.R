@@ -77,11 +77,11 @@ proposal.med.var <- function (c, V, precision = 3) {
 
 
 ## Minimum and maximum valid mean for a given variance, with small buffer
-u.min <- function (V, eps = 1e-18)  {
+u.min <- function (V, eps = 1e-20)  {
     return((1 - sqrt(1 - 4 * V)) / 2 + eps)
 }
 
-u.max <- function (V, eps = 1e-18)  {
+u.max <- function (V, eps = 1e-20)  {
     return((1 + sqrt(1 - 4 * V)) / 2 - eps)
 }
 
@@ -100,7 +100,10 @@ prop.dens <- function (u, loc = 0.001, V = 0, conc = 0, log = TRUE) {
 }
 
 
-## Objective function for density maximization with variance
+## Objective functions for density maximization with variance
+h <- function (u, center = 0.001, V = 0.001)  {
+    return((u^2 * (1 - u) / V - u - 1) * log(center) + (u * (1 - u)^2 / V - (1 - u) - 1) * log(1 - center) - lgamma(u^2 * (1 - u) / V - u) - lgamma(u * (1 - u)^2 / V - (1 - u)) + lgamma(u * (1 - u) / V - 1))
+}
 h.prime <- function (u, center = 0.001, V = 0.01)  {
     return((log(center) - psigamma(u^2 * (1 - u) / V - u)) * (u * (2 - 3 * u) / V - 1) +
            (log(1 - center) - psigamma(u * (1 - u)^2 / V - (1 - u))) * ((3 * u^2 - 4 * u + 1) / V + 1) +
@@ -108,7 +111,7 @@ h.prime <- function (u, center = 0.001, V = 0.01)  {
 }
 
 
-## Objective function for density maximization with concentration parameter
+## Objective function (derivative) for density maximization with concentration parameter
 g.prime <- function (u, center = 0.001, conc = 2)  {
     return(conc * log(center) - conc * log(1 - center) - psigamma(conc * u) * conc + psigamma(conc * (1 - u)) * conc)
 }
@@ -116,18 +119,23 @@ g.prime <- function (u, center = 0.001, conc = 2)  {
 
 ## density maximization parameters, fixed variance
 dens.max.var <- function (center, V = 0.01) {
-    roots <- uniroot.all(h.prime, lower = u.min(V), upper = u.max(V), center = center, V = V)
-    ind <- sapply(roots, prop.dens, loc = center, V = V) %>% which.max()
-    if (length(ind) > 1)  ind <- ind[1]
-    
-    u <- roots[ind]
+    # roots <- uniroot.all(h.prime, lower = u.min(V), upper = u.max(V), center = center, V = V)
+    # ind <- sapply(roots, prop.dens, loc = center, V = V) %>% which.max()
+    # if (length(ind) > 1)  ind <- ind[1]
+    # 
+    # u <- roots[ind]
+    u <- nlminb(center, 
+                objective = function (x) {-h(x, center, V)}, 
+                gradient = function (x) {-h.prime(x, center, V)},
+                lower = u.min(V), 
+                upper = u.max(V))$par
     alpha <- u * (1 - u) / V - 1
     return(list(a = alpha * u, b = alpha * (1 - u)))
 } 
 
 
 ## density maximization parameters, fixed concentration
-dens.max.conc <- function (center, conc = 1000, eps = 1e-18) {
+dens.max.conc <- function (center, conc = 1000, eps = 1e-16) {
     roots <- uniroot.all(g.prime, lower = eps, upper = 1 - eps, center = center, conc = conc)
     ind <- sapply(roots, prop.dens, loc = center, conc = conc) %>% which.max()
     if (length(ind) > 1)  ind <- ind[1]
@@ -139,6 +147,9 @@ dens.max.conc <- function (center, conc = 1000, eps = 1e-18) {
 
 ## density maximization parameters for Dirichlet
 dens.max.dir <- function (center, V = 0.01, renormalize = TRUE) {
+    if (sum(center) != 1 || sum(center < 0) > 0)  {
+        stop("center is not a valid point in the simplex")
+    }
     if (renormalize && sum(center == 1e-16) > 0)  {
         center[center == 1e-16] <- 1e-16
         center <- center / sum(center)
