@@ -119,6 +119,8 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
         print("invalid mode")
         return()
     }
+    colnames(new.counts) <- colnames(loadings)
+    rownames(new.counts) <- rownames(sigs)
     return(new.counts)
 }
 

@@ -1,6 +1,5 @@
 # This file runs a mutational signature analysis on synthetic data to test the 
 # effectiveness of the optimally-tuned Dirichlet prior
-
 library(CompressiveNMF)
 library(tidyverse)
 library(LaplacesDemon)
