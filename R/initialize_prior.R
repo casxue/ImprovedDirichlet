@@ -27,6 +27,7 @@ beta.quantile <- function (u, v, alpha, N) {
 
 
 ## Find mean u for Beta distribution with median c and concentration alpha
+## Need to increase precision if concentration is small!!
 arg.median.beta <- function (c, alpha, precision = 5) {
     M <- 10^precision
     u <- mean(binsearch(beta.quantile, c(0, M), v = c, alpha = alpha, N = M, target = 0.5)$where) / M
@@ -80,7 +81,6 @@ proposal.med.var <- function (c, V, precision = 3) {
 u.min <- function (V, eps = 1e-16)  {
     return((1 - sqrt(1 - 4 * V)) / 2 + eps)
 }
-
 u.max <- function (V, eps = 1e-16)  {
     return((1 + sqrt(1 - 4 * V)) / 2 - eps)
 }
@@ -114,7 +114,11 @@ h.prime <- function (u, center = 0.001, V = 0.01)  {
 }
 
 
-## Objective function (derivative) for density maximization with concentration parameter
+## Objective functions for density maximization with concentration parameter
+g <- function (u, center = 0.001, conc = 2)  {
+    return((conc * u - 1) * log(center) + (conc * (1 - u) - 1) * log(1 - center) - 
+           lgamma(conc * u) - lgamma(conc * (1 - u)) + lgamma(conc))
+}
 g.prime <- function (u, center = 0.001, conc = 2)  {
     return(conc * log(center) - conc * log(1 - center) - psigamma(conc * u) * conc + psigamma(conc * (1 - u)) * conc)
 }
@@ -130,7 +134,7 @@ dens.max.var <- function (center, V = 0.01) {
     c <- min(center, 1 - center)
     u <- nlminb(c, 
                 objective = function (x) {-h(x, c, V)}, 
-                gradient = function (x) {-h.prime(x, c, V)},
+                # gradient = function (x) {-h.prime(x, c, V)},
                 lower = u.min(V), 
                 upper = 0.5)$par
     if (center > 0.5)  u <- 1 - u
@@ -141,11 +145,18 @@ dens.max.var <- function (center, V = 0.01) {
 
 ## density maximization parameters, fixed concentration
 dens.max.conc <- function (center, conc = 1000, eps = 1e-18) {
-    roots <- uniroot.all(g.prime, lower = eps, upper = 1 - eps, center = center, conc = conc)
-    ind <- sapply(roots, prop.dens, loc = center, conc = conc) %>% which.max()
-    if (length(ind) > 1)  ind <- ind[1]
-    
-    u <- roots[ind]
+    # roots <- uniroot.all(g.prime, lower = eps, upper = 1 - eps, center = center, conc = conc)
+    # ind <- sapply(roots, prop.dens, loc = center, conc = conc) %>% which.max()
+    # if (length(ind) > 1)  ind <- ind[1]
+    # 
+    # u <- roots[ind]
+    c <- min(center, 1 - center)
+    u <- nlminb(c,
+                objective = function (x) {-g(x, c, conc)},
+                gradient = function (x) {-g.prime(x, c, conc)},
+                lower = eps,
+                upper = 0.5)$par
+    if (center > 0.5)  u <- 1 - u
     return(list(a = conc * u, b = conc * (1 - u)))
 } 
 
