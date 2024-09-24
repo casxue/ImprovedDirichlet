@@ -81,7 +81,7 @@ simulate.counts <- function (loadings, sigs, mode = "poisson", param = 0, seed =
         }
         means <- sigs %*% loadings
         new.counts <- means %>%
-            sapply(function (y) {rnbinom(1, size = y, mu = param)}) %>%
+            sapply(function (y) {rnbinom(1, size = param, mu = y)}) %>%
             matrix(nrow = I, ncol = J)
     } else if (mode == "perturbed")  {
         if (param >= 1 || param <= 0)  {
