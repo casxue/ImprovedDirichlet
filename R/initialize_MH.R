@@ -1,4 +1,4 @@
-source("initialize_prior.R")
+# source("initialize_prior.R")
 
 # library(Ternary)
 library(parallel)
