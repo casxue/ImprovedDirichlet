@@ -1,123 +1,26 @@
-library(dplyr)
-library(gtools)
-library(LaplacesDemon)
-library(scales)
-library(Ternary)
+source("initialize_prior.R")
+
+# library(Ternary)
 library(parallel)
 library(foreach)
-library(rootSolve)
+# library(rootSolve)
 library(rstan)
 library(latex2exp)
 
 
-## Variance-based concentration parameter 
-param.variance <- function (u, delta, total.var = FALSE) {
-    if (length(u) == 1 || total.var)  {
-        return(sum(u * (1 - u)) / delta - 1)
-    } else  {
-        return(min(u) * (1 - min(u)) / delta - 1)
-    }
-}
-
-
-## Effective sample size
-ESS <- function (vec, M = length(vec), trunc = M - 1) {
+## ACF and effective sample size, but not broken
+ac.new <- function (vec, trunc = length(vec) - 1) {
     ac <- acf(vec, lag.max = trunc, plot = FALSE)[1:trunc][[1]]
     if (sum(is.nan(ac)) > 0)  {
         ac <- rep(1, length(ac))
     }
+    return(ac)
+}
+ESS <- function (vec, M = length(vec), trunc = M - 1) {
+    ac <- ac.new(vec, trunc)
     delta <- 1:trunc
     Teff <- M / (1 + 2 * sum((1 - delta / M) * ac))
     return(Teff)
-}
-
-
-## Find quantile of v for Beta distribution with mean u/N and concentration alpha
-beta.quantile <- function (u, v, alpha, N) {
-    u <- u / N
-    return(pbeta(v, alpha * u, alpha * (1 - u)))
-}
-
-
-## Find mean u for Beta distribution with median c and concentration alpha
-arg.median.beta <- function (c, alpha, precision = 5) {
-    M <- 10^precision
-    u <- mean(binsearch(beta.quantile, c(0, M), v = c, alpha = alpha, N = M, target = 0.5)$where) / M
-    return(u)
-}
-
-
-## Find variance for Beta distribution with given median and log concentration parameter floor.log.conc + n / N
-variance.from.median.concentration <- function (n, median, floor.log.conc, N) {
-    alpha <- 2^(floor.log.conc + n / N)
-    u <- arg.median.beta(median, alpha)
-    var <- u * (1 - u) / (alpha + 1)
-    return(var)
-}
-
-## Identify mean & concentration for Beta distribution based on median & variance via coordinate descent
-proposal.med.var <- function (c, var, precision = 3) {
-    var.target <- var
-    conc <- 2
-    
-    u <- arg.median.beta(c, conc)
-    var <- u * (1 - u) / (conc + 1)
-    
-    if (var > var.target) {
-        while (var > var.target) {
-            conc <- conc * 2
-            u <- arg.median.beta(c, conc)
-            var <- u * (1 - u) / (conc + 1)
-        }
-        floor.log.conc <- log2(conc) - 1
-    } else if (var < var.target) {
-        while (var < var.target) {
-            conc <- conc / 2
-            u <- arg.median.beta(c, conc)
-            var <- u * (1 - u) / (conc + 1)
-        }
-        floor.log.conc <- log2(conc)
-    }
-    
-    M <- 10^precision
-    log.conc <- mean(binsearch(variance.from.median.concentration, c(0, M), median = c, floor.log.conc = floor.log.conc, N = M, target = var.target)$where) / M + floor.log.conc
-    conc <- 2^log.conc
-    u <- arg.median.beta(c, conc)
-    var <- u * (1 - u) / (conc + 1)
-    
-    return(list(mean = u, alpha = conc, var.actual = var))
-}
-
-
-## Minimum and maximum valid mean for a given variance, with small buffer
-u.min <- function (S, eps = 1e-8)  {
-    return((1 - sqrt(1 - 4 * S)) / 2 + eps)
-}
-
-u.max <- function (S, eps = 1e-8)  {
-    return((1 + sqrt(1 - 4 * S)) / 2 - eps)
-}
-
-
-## Evaluate density at target point loc under a Beta with mean u and specified variance or concentration 
-prop.dens <- function (u, loc = 0.001, var = 0, conc = 0, log = TRUE) {
-    if (var > 0 && conc == 0) {
-        alpha <- u * (1 - u) / var - 1
-    } else if (var == 0 && conc > 0) {
-        alpha <- conc
-    } else {
-        print("Need valid variance or concentration.")
-        return(NA)
-    }
-    return(dbeta(loc, alpha * u, alpha * (1 - u), log = log))
-}
-
-
-## Objective function for density maximization
-h.prime <- function (u, center = 0.001, var = 0.01)  {
-    return((log(center) - psigamma(u^2 * (1 - u) / var - u)) * (u * (2 - 3 * u) / var - 1) +
-           (log(1 - center) - psigamma(u * (1 - u)^2 / var - (1 - u))) * ((3 * u^2 - 4 * u + 1) / var + 1) +
-           psigamma(u * (1 - u) / var - 1) * (1 - 2 * u) / var)
 }
 
 
@@ -126,7 +29,7 @@ h.prime <- function (u, center = 0.001, var = 0.01)  {
 proposal.params <- list()
 
 ## 1A: mean, fixed concentration
-proposal.params[[1]] <- function (u, alpha = 2) {
+proposal.params[[1]] <- function (u, alpha = 5) {
     return(list(a = alpha * u, b = alpha * (1 - u)))
 }
 
@@ -144,7 +47,7 @@ proposal.params[[3]] <- function (u) {
 }
 
 ## 1B: median, fixed concentration
-proposal.params[[4]] <- function (med, alpha = 2) {
+proposal.params[[4]] <- function (med, alpha = 5) {
     u <- arg.median.beta(med, alpha)
     return(list(a = alpha * u, b = alpha * (1 - u)))
 }
@@ -162,20 +65,25 @@ proposal.params[[6]] <- function (med) {
     return(list(a = p$alpha * p$mean, b = p$alpha * (1 - p$mean), iters = p$iters))
 } 
 
-## C: density maximization, fixed variance
-proposal.params[[7]] <- function (center, var = 0.1) {
-    roots <- uniroot.all(h.prime, lower = u.min(var), upper = u.max(var), center = center, var = var)
-    ind <- sapply(roots, prop.dens, loc = center, var = var) %>% which.max()
-    if (length(ind) > 1)  ind <- ind[1]
-    
-    u <- roots[ind]
-    alpha <- u * (1 - u) / var - 1
-    return(list(a = alpha * u, b = alpha * (1 - u)))
+## 1C: density maximization, fixed concentration
+proposal.params[[7]] <- function (center, alpha = 5) {
+    return(dens.max.conc(center, alpha))
+} 
+
+## 2C: density maximization, fixed variance
+proposal.params[[8]] <- function (center, var = 0.1) {
+    return(dens.max.var(center, var))
+} 
+
+## 3C: maximum density, adaptive variance
+proposal.params[[9]] <- function (center) {
+    sd <- min(center, 1 - center, sqrt(0.1))
+    return(dens.max.var(center, sd^2))
 } 
 
 
 ## sampler function
-sample.MH <- function (exp, initial = 0.25, S = 0.05, n.burn = 0, n.samps = 1e4, seed = 2024, a0 = 1, b0 = 1000, verbose = FALSE)  {
+sample.MH <- function (exp, initial = 0.25, alpha = 5, V = 0.1, n.burn = 0, n.samps = 1e4, seed = 2024, a0 = 1, b0 = 1000, is.mixture = FALSE, verbose = FALSE)  {
     set.seed(seed)
     
     samples <- numeric(n.samps)
@@ -183,10 +91,12 @@ sample.MH <- function (exp, initial = 0.25, S = 0.05, n.burn = 0, n.samps = 1e4,
     counter <- 0
     
     for (j in 1:(n.burn + n.samps))  {
-        if (exp %in% c(2, 5, 7))  {
-            params.curr <- proposal.params[[exp]](current, S)
-        }
-        else  {
+        ## compute proposal
+        if (exp %% 3 == 1)  {
+            params.curr <- proposal.params[[exp]](current, alpha)
+        } else if (exp %% 3 == 2)  {
+            params.curr <- proposal.params[[exp]](current, V)
+        } else  {
             params.curr <- proposal.params[[exp]](current)
         }
 
@@ -194,19 +104,27 @@ sample.MH <- function (exp, initial = 0.25, S = 0.05, n.burn = 0, n.samps = 1e4,
             counter <- counter + 1
         } 
         
+        ## compute parameters of return probability
         prop <- rbeta(1, params.curr$a, params.curr$b)
-        if (exp %in% c(2, 5, 7))  {
-            params.prop <- proposal.params[[exp]](prop, S)
-        }
-        else  {
+        if (exp %% 3 == 1)  {
+            params.prop <- proposal.params[[exp]](prop, alpha)
+        } else if (exp %% 3 == 2)  {
+            params.prop <- proposal.params[[exp]](prop, V)
+        } else  {
             params.prop <- proposal.params[[exp]](prop)
         }
         
-        log.accept <- dbeta(prop, a0, b0, log = TRUE) - dbeta(current, a0, b0, log = TRUE) +
-            dbeta(current, params.prop$a, params.prop$b, log = TRUE) - dbeta(prop, params.curr$a, params.curr$b, log = TRUE)
-        # log.accept <- log(0.75 * dbeta(prop, 2, 5) + 0.25 * dbeta(prop, 10, 2)) - 
-        #     log(0.75 * dbeta(current, 2, 5) + 0.25 * dbeta(current, 10, 2)) + 
-        #     dbeta(current, params.prop$a, params.prop$b, log = TRUE) - dbeta(prop, params.curr$a, params.curr$b, log = TRUE)
+        ## compute acceptance ratio
+        if (is.mixture)  {
+            log.accept <- log(0.75 * dbeta(prop, 2, 5) + 0.25 * dbeta(prop, 10, 2)) - 
+                log(0.75 * dbeta(current, 2, 5) + 0.25 * dbeta(current, 10, 2)) + 
+                dbeta(current, params.prop$a, params.prop$b, log = TRUE) - dbeta(prop, params.curr$a, params.curr$b, log = TRUE)
+        } else  {
+            log.accept <- dbeta(prop, a0, b0, log = TRUE) - dbeta(current, a0, b0, log = TRUE) +
+                dbeta(current, params.prop$a, params.prop$b, log = TRUE) - dbeta(prop, params.curr$a, params.curr$b, log = TRUE)
+        }
+
+        ## accept/reject
         if (!is.nan(log.accept) && exp(log.accept) > runif(1))  {
             current <- prop
         } 
@@ -225,6 +143,7 @@ sample.MH <- function (exp, initial = 0.25, S = 0.05, n.burn = 0, n.samps = 1e4,
 }
 
 ## sampler function with 0/1 bit to handle numerical stability near 1
+## NOT UPDATED YET
 sample.MH.augmented <- function (exp, initial = 0.25, S = 0.05, n.burn = 0, n.samps = 1e4, seed = 2024, a0 = 1, b0 = 1000, verbose = FALSE)  {
     set.seed(seed)
     

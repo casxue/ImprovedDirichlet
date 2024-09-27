@@ -2,10 +2,7 @@ library(dplyr)
 library(gtools)
 library(LaplacesDemon)
 library(scales)
-library(parallel)
-library(foreach)
-library(rootSolve)
-library(rstan)
+# library(rootSolve)
 library(latex2exp)
 
 
