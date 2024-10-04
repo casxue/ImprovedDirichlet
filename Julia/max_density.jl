@@ -94,6 +94,10 @@ function max_density_for_beta(c, v; a_init=c, b_init=1-c, tol=1e-8, maxiter=100,
 end
 
 
+lgamma_stirling(x) = 0.5*log(2*pi/x) + x*(log(x) - 1)
+
+lbeta_stirling(a) = (k=length(a); s=sum(a); 0.5*(k-1)*log(2*pi) + 0.5*log(s) - 0.5*sum(log.(a)) + sum(a.*log.(a/s)))
+
 
 
 # _____________________________________________________________________________
@@ -123,21 +127,24 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
     elseif version=="kl_uniform"
         @assert(theta > 0, "KL divergence must satisfy theta > 0, but input value is theta = $theta.")
     else
-        @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration', 'cosine error', or 'entropy'.")
-    end
-    
-    if isempty(a_init)
-        if version=="kl_uniform"
-            a_init=10*exp(theta/2)*c
-        else
-            a_init = c
-        end
+        @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration' or 'kl_uniform'.")
     end
 
     k = length(c)
     m = argmin(c)
     
-    for attempt = 1:10
+    if isempty(a_init)
+        if version=="kl_uniform"
+            # a_init=10*exp(theta/2)*c  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            # a_init=10*exp(theta/2)*(c + ones(k))/2
+            a_init=10*(c + ones(k))/2
+            # a_init=10*c
+        else
+            a_init = c
+        end
+    end
+    
+    for attempt = 1:5
         a = a_init
         a_old = a
         
@@ -155,8 +162,9 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
                 
             elseif version == "kl_uniform"
                 s = sum(a)
-                entropy = sum(lgamma.(a)) - lgamma(s) + (s - k)*digamma(s) - sum((a .- 1).*digamma.(a))
-                h = -entropy - lgamma(k) - theta
+                ent = sum(lgamma.(a)) - lgamma(s) + (s - k)*digamma(s) - sum((a .- 1).*digamma.(a))
+                # ent = lbeta_stirling(a) + (s - k)*digamma(s) - sum((a .- 1).*digamma.(a))
+                h = -ent - lgamma(k) - theta
                 J = -(s-k)*trigamma(s) .+ (a.-1).*trigamma.(a)
                 J = vec(J)'
             end
@@ -169,6 +177,8 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
                 f = sum(lgamma.(a)) - lgamma(sum(a)) - sum((a.-1).*log.(c))  # only used for printing the value of the objective function
                 @printf("iter = %i     f = %.10f    h = %.10f\n", iter, f, h)
                 # println("     a = ",round.(a; digits=3))
+                if isnan(f); @assert(false); end
+                # readline()
             end
             
             a_old = a
@@ -181,10 +191,12 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
             if sum(abs.(a./a_old .- 1)) + abs(h) < tol; return a; end
         end
         
+        if verbose && (log10(s) - log10(tol) < 16); println("Sum of a values may be too large to handle in floating-point precision.  Can try reducing tol to force convergence."); end
         if verbose; println("Failed to converge. Retrying with stepsize=$stepsize and maxiter=$maxiter."); end
         stepsize = stepsize/5
         maxiter = maxiter*5
     end
+    
     
     @assert(false, "Failed to converge after all attempts.")
     
