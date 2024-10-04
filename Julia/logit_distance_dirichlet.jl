@@ -4,6 +4,7 @@ using Distributions
 using PyPlot
 using SpecialFunctions
 using Statistics
+using StatsBase
 include("max_density.jl")
 
 
@@ -31,10 +32,11 @@ else
 end
 v = 0.1
 alpha = 1.0
-
+theta = 5
 
 # Max density method
-a1 = max_density_for_dirichlet(c,v; alpha=alpha, verbose=false)
+a1 = max_density_for_dirichlet(c,alpha,"concentration"; verbose=false)
+# a1 = max_density_for_dirichlet(c,theta,"kl_uniform"; verbose=false)
 p1 = rand(Dirichlet(a1),N)
 d1 = [sum(abs.(logit.(p1[:,i]) .- logit.(c))) for i=1:N]
 
@@ -80,7 +82,7 @@ plot(xs, f1, "b-", lw=2, label="max density")
 plot(xs, f2, "r-", lw=2, label="mean method")
 xlim(0,xmax*0.6)
 xlabel("distance from target location")
-ylabel("frequency")
+# ylabel("frequency")
 # title("c = $c")
 legend()
 savefig("logit_distance-$tag.png",dpi=200)
