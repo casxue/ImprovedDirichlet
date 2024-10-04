@@ -101,12 +101,14 @@ end
 #
 # Inputs:
 #   c = (length k vector) target location such that sum(c) = 1 and all(c > 0)
-#   v = variance between 0 and 0.25
+#   theta = interpretation depends on version
+#   version = meaning of theta, can be either:
+#       "concentration": theta = concentration parameter
+#       "kl_uniform":    theta = Kullback-Leibler divergence from the uniform distribution on the simplex
 #
 # Optional inputs:
 #   a_init = initial a for optimization algorithm
 #   tol = convergence tolerance for optimization algorithm
-#   alpha = concentration parameter  (If specified, this overrides the variance v.)
 #
 # Outputs:
 #   a = (length k vector) Dirichlet parameters
@@ -114,14 +116,27 @@ end
 # Reference: This is based on the general algorithm for Newton's method with equality constraints described here:
 #   https://www.cs.cmu.edu/~ggordon/10725-F12/scribes/10725_Lecture12.pdf
 #
-function max_density_for_dirichlet(c, v; a_init=c, tol=1e-8, maxiter=100, stepsize=0.5, verbose=true, alpha=NaN)
+function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8, maxiter=100, stepsize=0.5, verbose=true)
     @assert((abs(sum(c)-1)<1e-10) && all(c.>0), "Target location must satisfy sum(c)=1 and all(c>0), but input value is c = $c.")
-    @assert(0 < v < 0.25, "Variance must satisfy 0 < v < 0.25, but input value is v = $v.")
-    if !isnan(alpha); @assert(alpha > 0, "Concentration parameter must satisfy alpha > 0, but input value is alpha = $alpha."); end
+    if version=="concentration"
+        @assert(theta > 0, "Concentration parameter must satisfy theta > 0, but input value is theta = $theta.")
+    elseif version=="kl_uniform"
+        @assert(theta > 0, "KL divergence must satisfy theta > 0, but input value is theta = $theta.")
+    else
+        @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration', 'cosine error', or 'entropy'.")
+    end
+    
+    if isempty(a_init)
+        if version=="kl_uniform"
+            a_init=10*exp(t/2)*c
+        else
+            a_init = c
+        end
+    end
 
     k = length(c)
     m = argmin(c)
-
+    
     for attempt = 1:10
         a = a_init
         a_old = a
@@ -134,21 +149,16 @@ function max_density_for_dirichlet(c, v; a_init=c, tol=1e-8, maxiter=100, stepsi
             # Hessian of objective function
             H = diagm(trigamma.(a)) .- trigamma(sum(a))
             
-            if isnan(alpha)
-                # Constraint function
+            if version == "concentration"
+                h = sum(a)/theta - 1        # Constraint function
+                J = ones(1,k)*(1/theta)     # Jacobian of constraint function
+                
+            elseif version == "kl_uniform"
                 s = sum(a)
-                h = log(a[m]) + log(s - a[m]) - 2*log(s) - log(s+1) - log(v)
-                
-                # Jacobian of constraint function
-                J = ones(1,k) * (1/(s-a[m]) - 2/s - 1/(s+1))
-                J[m] = 1/a[m] - 2/s - 1/(s+1)
-                
-            else
-                # Constraint function
-                h = sum(a)/alpha - 1
-                
-                # Jacobian of constraint function
-                J = ones(1,k)*(1/alpha)
+                entropy = sum(lgamma.(a)) - lgamma(s) + (s - k)*digamma(s) - sum((a .- 1).*digamma.(a))
+                h = -entropy - lgamma(k) - theta
+                J = -(s-k)*trigamma(s) .+ (a.-1).*trigamma.(a)
+                J = vec(J)'
             end
             
             A = [H J' ; J 0]
@@ -158,7 +168,7 @@ function max_density_for_dirichlet(c, v; a_init=c, tol=1e-8, maxiter=100, stepsi
             if verbose
                 f = sum(lgamma.(a)) - lgamma(sum(a)) - sum((a.-1).*log.(c))  # only used for printing the value of the objective function
                 @printf("iter = %i     f = %.10f    h = %.10f\n", iter, f, h)
-                println("     a = ",round.(a; digits=3))
+                # println("     a = ",round.(a; digits=3))
             end
             
             a_old = a
