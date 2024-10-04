@@ -114,7 +114,7 @@ end
 # Reference: This is based on the general algorithm for Newton's method with equality constraints described here:
 #   https://www.cs.cmu.edu/~ggordon/10725-F12/scribes/10725_Lecture12.pdf
 #
-function max_density_for_dirichlet(c, v; a_init=c, tol=1e-8, maxiter=100, stepsize=0.5, verbose=true, alpha=NaN)
+function max_density_for_dirichlet(c, v; a_init=c, tol=1e-8, maxiter=100, stepsize=0.5, verbose=false, alpha=NaN)
     @assert((abs(sum(c)-1)<1e-10) && all(c.>0), "Target location must satisfy sum(c)=1 and all(c>0), but input value is c = $c.")
     @assert(0 < v < 0.25, "Variance must satisfy 0 < v < 0.25, but input value is v = $v.")
     if !isnan(alpha); @assert(alpha > 0, "Concentration parameter must satisfy alpha > 0, but input value is alpha = $alpha."); end

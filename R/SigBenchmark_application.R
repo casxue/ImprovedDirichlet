@@ -48,6 +48,14 @@ source("R/initialize_prior.R")
 #   return(list(a = alpha * u, b = alpha * (1 - u)))
 # } 
 
+simulate.count.matrix <- function(loadings, sigs, overdispersion = 0){
+  I <- nrow(sigs); J <- ncol(loadings)
+  X <- matrix(rnbinom(I * J, size = 1/overdispersion, mu = c(sigs %*% loadings)), nrow = I, ncol = J)
+  colnames(X) <- colnames(loadings)
+  rownames(X) <- rownames(sigs)
+  return(X)
+}
+
 tune_prior <- function(sigs, mode = "maxdens", V = 6e-7, alpha_fixed = 1000){
   if(mode == "maxdens"){
     S <- apply(sigs, 2, function(x) suppressWarnings(dens.max.dir(x, V = V)))
@@ -97,9 +105,9 @@ sigs_all <- as.matrix(apply(sigs_all, 2, function(x) x/sum(x)))
 sigs_temp <- sigs_all#[, c("SBS1", "SBS5")]#[, c("SBS1", "SBS2", "SBS3", "SBS13", "SBS5")]
 # Tune the infomative prior
 S_maxdens <- tune_prior(sigs_temp, V = 6e-7, mode = "maxdens")
-S_fixed <- tune_prior(sigs_temp, alpha_fixed = median(colSums(S_maxdens)), mode = "fixed")
+S_fixed <- tune_prior(sigs_temp, alpha_fixed = 242, mode = "fixed")
 
-i <- 2
+i <- 3
 samples <- rdirichlet(2000, S_maxdens[, i])
 CI <- t(apply(samples, 2, function(x) quantile(x, c(0.05, 0.95))))
 p1 <- plot.SBS.signature(sigs_temp[, i], CI = CI) + ggtitle("Max_dens")
@@ -111,29 +119,29 @@ ggpubr::ggarrange(p1, p2, ncol = 1)
 colSums(S_maxdens)
 
 # Run the model
-nsamples <- 500
-burnin <- 1500
+nsamples <- 1000
+burnin <- 2000
 
-J <- 100
+I <- nrow(sigs)
+J <- 50
+
+
+set.seed(42)
 id_sample <- sort(sample(1:ncol(X), J))
+X_sim <- simulate.count.matrix(loadings[, id_sample], sigs, overdispersion = 0)
+plot(X[, id_sample], X_sim)
 
-set.seed(10)
-X_sim <- simulate.counts(loadings, sigs, )
 
-plot(X[, id_sample], sigs %*% loadings[, id_sample])
-
-out_noprior <- CompressiveNMF(X[, id_sample], K = 5, 
+out_noprior <- CompressiveNMF(X_sim, K = 20, 
                               nsamples = nsamples, 
                              burnin = burnin, 
                              alpha = 0.5)
 CompressiveNMF:::print.CompressiveNMF(out_noprior)
 
 rownames(out_noprior$Signatures) <- rownames(X)
-ggpubr::ggarrange(plot.SBS.signature(out_noprior$Signatures[, 1]), 
-                  plot.SBS.signature(out_noprior$Signatures[, 2]), ncol = 1)
+plot.SBS.signature(out_noprior$Signatures)
 
-
-out_maxdens <- CompressiveNMF(X[, id_sample], K = 3, nsamples = nsamples, 
+out_maxdens <- CompressiveNMF(X_sim, K = 0, nsamples = nsamples, 
                               burnin = burnin, 
                               S = S_maxdens, 
                               betah = rep(1, ncol(S_maxdens)),
@@ -141,11 +149,10 @@ out_maxdens <- CompressiveNMF(X[, id_sample], K = 3, nsamples = nsamples,
 CompressiveNMF:::print.CompressiveNMF(out_maxdens)
 
 rownames(out_maxdens$Signatures) <- rownames(X)
-ggpubr::ggarrange(plot.SBS.signature(out_maxdens$Signatures[, 1]), 
-                  plot.SBS.signature(out_maxdens$Signatures[, 2]), ncol = 1)
+plot.SBS.signature(out_maxdens$Signatures)
 
 
-out_fixed <- CompressiveNMF(X[, id_sample], K = 3, nsamples = nsamples, 
+out_fixed <- CompressiveNMF(X_sim, K = 0, nsamples = nsamples, 
                               burnin = burnin, 
                               S = S_fixed, 
                               betah = rep(1, ncol(S_maxdens)),
@@ -153,9 +160,7 @@ out_fixed <- CompressiveNMF(X[, id_sample], K = 3, nsamples = nsamples,
 CompressiveNMF:::print.CompressiveNMF(out_fixed)
 
 rownames(out_fixed$Signatures) <- rownames(X)
-ggpubr::ggarrange(plot.SBS.signature(out_fixed$Signatures[, 1]), 
-                  plot.SBS.signature(out_fixed$Signatures[, 2]), ncol = 1)
-
+plot.SBS.signature(out_fixed$Signatures)
 
 
 sqrt(mean(out_maxdens$Signatures - sigs)^2)
