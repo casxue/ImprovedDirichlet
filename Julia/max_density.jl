@@ -128,7 +128,7 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
     
     if isempty(a_init)
         if version=="kl_uniform"
-            a_init=10*exp(t/2)*c
+            a_init=10*exp(theta/2)*c
         else
             a_init = c
         end

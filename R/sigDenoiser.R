@@ -546,9 +546,11 @@ names(w) <- colnames(X)
 sort(w)
 
 
-## Illustation
-apply(X, 2, function(x) - sum(x * log(x)))
+#------------------------------------------------------------------ Illustation
 
+alpha_new <- julia_call("max_density_for_dirichlet", c(X[, 1]), 10, "kl_uniform")
+
+apply(X, 2, function(x) - sum(x * log(x)))
 
 cut(apply(X, 2, function(x) - sum(x * log(x))), breaks = 5)
 
