@@ -109,6 +109,7 @@ lbeta_stirling(a) = (k=length(a); s=sum(a); 0.5*(k-1)*log(2*pi) + 0.5*log(s) - 0
 #   version = meaning of theta, can be either:
 #       "concentration": theta = concentration parameter
 #       "kl_uniform":    theta = Kullback-Leibler divergence from the uniform distribution on the simplex
+#       "cosine_error":  theta = mean cosine error between a sample from the Dirichlet and its mean
 #
 # Optional inputs:
 #   a_init = initial a for optimization algorithm
@@ -120,14 +121,16 @@ lbeta_stirling(a) = (k=length(a); s=sum(a); 0.5*(k-1)*log(2*pi) + 0.5*log(s) - 0
 # Reference: This is based on the general algorithm for Newton's method with equality constraints described here:
 #   https://www.cs.cmu.edu/~ggordon/10725-F12/scribes/10725_Lecture12.pdf
 #
-function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8, maxiter=100, stepsize=0.5, verbose=false)
+function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8, maxiter=100, stepsize=0.5, verbose=true)
     @assert((abs(sum(c)-1)<1e-10) && all(c.>0), "Target location must satisfy sum(c)=1 and all(c>0), but input value is c = $c.")
     if version=="concentration"
         @assert(theta > 0, "Concentration parameter must satisfy theta > 0, but input value is theta = $theta.")
     elseif version=="kl_uniform"
         @assert(theta > 0, "KL divergence must satisfy theta > 0, but input value is theta = $theta.")
+    elseif version=="cosine_error"
+        @assert(0 < theta < 1, "Cosine error must satisfy 0 < theta < 1, but input value is theta = $theta.")
     else
-        @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration' or 'kl_uniform'.")
+        @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration', 'kl_uniform', or 'cosine_error'.")
     end
 
     k = length(c)
@@ -139,6 +142,8 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
             # a_init=10*exp(theta/2)*(c + ones(k))/2
             a_init=10*(c + ones(k))/2
             # a_init=10*c
+        elseif version=="cosine_error"
+            a_init=10*(c + ones(k))/2
         else
             a_init = c
         end
@@ -167,6 +172,24 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
                 h = -ent - lgamma(k) - theta
                 J = -(s-k)*trigamma(s) .+ (a.-1).*trigamma.(a)
                 J = vec(J)'
+            
+            elseif version == "cosine_error"
+                s = sum(a)
+                s2 = sum(a.^2)
+                s3 = sum(a.^3)
+                h = -log(2) + log(s) - log(s+1) - log(s2) + log(s - s3/s2) - log(theta)
+                J = 1/s .- 1/(s+1) .- 2*a/s2 .+ (1 .- (s2*3*(a.^2) .- s3*2*a)/s2^2) / (s - s3/s2)
+                J = vec(J)'
+                
+                # h = log(sum(a.*c)) - log(s) - log(sum(c.*c)) - log(1-theta)
+                # J = c/sum(a.*c) .- 1/s
+                # h = log(sum(a.*c)) - 0.5*log(sum(a.*a)) - 0.5*log(sum(c.*c)) - log(1-theta)
+                # J = c/sum(a.*c) .- a/sum(a.*a)
+                # h = (1 - sum((a/s).*c)/sum(c.*c))/theta - 1
+                # J = -(s*c)/sum(c.*c) .- sum((-a/s^2).*c)/sum(c.*c)
+                # h = log(sum(a.*c)) - log(sum(c.*c)) - log(1-theta)
+                # J = c/sum(a.*c)
+                # J = vec(J)'
             end
             
             A = [H J' ; J 0]
@@ -176,7 +199,7 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
             if verbose
                 f = sum(lgamma.(a)) - lgamma(sum(a)) - sum((a.-1).*log.(c))  # only used for printing the value of the objective function
                 @printf("iter = %i     f = %.10f    h = %.10f\n", iter, f, h)
-                # println("     a = ",round.(a; digits=3))
+                println("     a = ",round.(a; digits=3))
                 if isnan(f); @assert(false); end
                 # readline()
             end
@@ -191,7 +214,7 @@ function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8
             if sum(abs.(a./a_old .- 1)) + abs(h) < tol; return a; end
         end
         
-        if verbose && (log10(s) - log10(tol) < 16); println("Sum of a values may be too large to handle in floating-point precision.  Can try reducing tol to force convergence."); end
+        if verbose && (log10(sum(a)) - log10(tol) < 16); println("Sum of a values may be too large to handle in floating-point precision.  Can try reducing tol to force convergence."); end
         if verbose; println("Failed to converge. Retrying with stepsize=$stepsize and maxiter=$maxiter."); end
         stepsize = stepsize/5
         maxiter = maxiter*5
