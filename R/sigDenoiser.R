@@ -42,7 +42,7 @@ rdir <- function(nsamples, alpha){
     stop("Entries of alpha need to be positive")
   }
   n <- length(alpha)
-  out <- matrix(rgamma(nsamples * n, alpha, 1), ncol = n, nrow = nsamples, byrow = TRUE) + 1e-9
+  out <- matrix(rgamma(nsamples * n, alpha, 1), ncol = n, nrow = nsamples, byrow = TRUE) + 1e-10
   #res <- pmax(t(apply(out, 1, function(x) x/sum(x))), 1e-9)
   res <- t(apply(out, 1, function(x) x/sum(x)))
   return(res)

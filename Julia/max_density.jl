@@ -121,14 +121,14 @@ lbeta_stirling(a) = (k=length(a); s=sum(a); 0.5*(k-1)*log(2*pi) + 0.5*log(s) - 0
 # Reference: This is based on the general algorithm for Newton's method with equality constraints described here:
 #   https://www.cs.cmu.edu/~ggordon/10725-F12/scribes/10725_Lecture12.pdf
 #
-function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8, maxiter=100, stepsize=0.5, verbose=true)
+function max_density_for_dirichlet(c, theta, version; a_init=Float64[], tol=1e-8, maxiter=100, stepsize=0.5, verbose=false)
     @assert((abs(sum(c)-1)<1e-10) && all(c.>0), "Target location must satisfy sum(c)=1 and all(c>0), but input value is c = $c.")
     if version=="concentration"
         @assert(theta > 0, "Concentration parameter must satisfy theta > 0, but input value is theta = $theta.")
     elseif version=="kl_uniform"
         @assert(theta > 0, "KL divergence must satisfy theta > 0, but input value is theta = $theta.")
     elseif version=="cosine_error"
-        @assert(0 < theta < 1, "Cosine error must satisfy 0 < theta < 1, but input value is theta = $theta.")
+        #@assert(0 < theta < 1, "Cosine error must satisfy 0 < theta < 1, but input value is theta = $theta.")
     else
         @assert(false, "Unknown argument for version.  Got $version but expected one of 'concentration', 'kl_uniform', or 'cosine_error'.")
     end

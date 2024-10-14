@@ -20,27 +20,9 @@ source("R/generate_synthetic_mutation_counts.R")
 source("R/plot_signature.R")
 source("R/initialize_prior.R")
 cosmic_3.4 <- read.COSMIC.sigs(version = "v3.4")
-X <- pmax(as.matrix(cosmic_3.4), 1e-12)
+X <- pmax(as.matrix(cosmic_3.4), 1e-10)
 X <- apply(X, 2, function(x) x/sum(x))
 write.csv(X, file = "data/cosmic3.4.csv")
-```
-
-
-```{julia}
-# include("Julia/max_density.jl")
-# num_cols = size(X, 2)
-# num_ks = 200
-# k_values = range(1.0, stop=200.0, length=num_ks)
-# # Create an empty matrix to store the results
-# results = zeros(Float64, size(X, 1), num_ks, size(X, 2))
-# for col in 1:size(X, 2)
-#     y = X[:, col]  # Get the column vector x
-#     # Loop over k from 1 to 200
-#     for (i, k) in enumerate(k_values)
-#         result = max_density_for_dirichlet(y, k, "kl_uniform")
-#         results[:, i, col] = result
-#     end
-# end
 ```
 
 
@@ -63,10 +45,6 @@ lsa::cosine(alpha_new, x)
 
 ```
 
-
-```{R}
-
-```
 
 ```{R}
 # Open the output of Julia

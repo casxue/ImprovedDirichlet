@@ -1,7 +1,6 @@
 # Apply the method max_density with kl to cosmic data, and save the output
 # so we can read it in R
 
-
 using Distributions
 using SpecialFunctions
 using LinearAlgebra
