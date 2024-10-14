@@ -98,14 +98,14 @@ for(i in 1:length(target_avg_cos)){
 
 
 # Make the plot 
-pdf(file = "plots/MutationalSignatures.pdf",  width = 6.85, height = 5.75)
+pdf(file = "plots/MutationalSignatures.pdf",  width = 5.84, height = 5.11)
 
 par(mfrow = c(1,1))
 plot(target_avg_cos, 
      apply(out_target_mean, 1, function(x) quantile(x, 0.75, na.rm = TRUE)), 
      col = 2, type = "l", lwd = 1.7, xlim = c(0.01, 0.3), 
-     xlab = "Target avg. cosine error", 
-     ylab = "Avg. cosine error across COSMIC signs.")
+     xlab = "Mean cosine error", 
+     ylab = "Average mean cosine error")
 lines(target_avg_cos, 
       apply(out_target_mean, 1, function(x) quantile(x, 0.15, na.rm = TRUE)), 
       col = 2, lwd = 1.7)
