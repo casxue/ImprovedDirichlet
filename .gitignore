@@ -3,3 +3,11 @@
 .RData
 .RDataTmp
 .Rproj.user
+
+**/.DS_Store
+stan/
+R/old_files
+data/old_data
+julia/old_files
+
+

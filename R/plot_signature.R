@@ -25,7 +25,7 @@ plot.SBS.signature <- function(signature,
     facet_grid(Sig~Mutation, scales = "free")+
     theme_minimal()+
     scale_fill_manual(values = palette)+
-    theme(aspect.ratio = 1,
+    theme(
           legend.position = "none",
           axis.title = element_blank(),
           axis.text.x = element_blank(),#element_text(angle = 90, color = "gray35",

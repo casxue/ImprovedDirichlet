@@ -98,14 +98,14 @@ for(i in 1:length(target_avg_cos)){
 
 
 # Make the plot 
-pdf(file = "plots/MutationalSignatures.pdf",  width = 5.84, height = 5.11)
+pdf(file = "plots/MutationalSignatures.pdf", width = 5, height = 5.50)
 
 par(mfrow = c(1,1))
 plot(target_avg_cos, 
      apply(out_target_mean, 1, function(x) quantile(x, 0.75, na.rm = TRUE)), 
      col = 2, type = "l", lwd = 1.7, xlim = c(0.01, 0.3), 
-     xlab = "Mean cosine error", 
-     ylab = "Average mean cosine error")
+     xlab = "Average mean cosine error", 
+     ylab = "Mean cosine error")
 lines(target_avg_cos, 
       apply(out_target_mean, 1, function(x) quantile(x, 0.15, na.rm = TRUE)), 
       col = 2, lwd = 1.7)
@@ -121,8 +121,9 @@ legend(0.01, 0.4, bty = "n", x.intersp = 0.75, y.intersp = 1.5, lwd = 1.5, seg.l
 
 dev.off()
 
-# 
-# 
+plot.SBS.signature(X[, c("SBS7a", "SBS3", "SBS26")])
+ggsave("plots/signatures_plot.pdf", width = 5, height = 5) 
+ 
 # par(mfrow = c(1,1))
 # plot(target_avg_cos, rowMeans(res1), type = "l", ylim = c(0, 0.43), xlab = "Target avg. error", xlim = c(0.01, 0.3), ylab = "Across signatures avg. error")
 # lines(target_avg_cos, apply(res1, 1, function(x) quantile(x, 0.15, na.rm = TRUE)), lty = "dashed", )
