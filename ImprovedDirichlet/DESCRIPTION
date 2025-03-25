@@ -1,0 +1,18 @@
+Package: ImprovedDirichlet
+Type: Package
+Title: What the Package Does (Title Case)
+Version: 0.1.0
+Authors@R: c(
+    person(
+      "Catherine", "Xue",
+      email = "cathysxue@gmail.com",
+      role = c("aut", "cre")
+    )
+  )
+Description: Computes and samples from Beta and Dirichlet distributions following 
+    maximum density parameterization.
+License: What license is it under?
+Encoding: UTF-8
+LazyData: true
+LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+Imports: Rcpp, RcppArmadillo, dplyr, LaplacesDemon, gtools, parallel, foreach, scales
